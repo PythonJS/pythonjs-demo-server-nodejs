@@ -1,7 +1,18 @@
 import tornado, tornado.web, tornado.ioloop
 import os
 
-PATHS = { 'webroot': './html'}
+PATHS = { 'webroot': './html', 'modules': {} }
+
+def check_for_node_modules( node_modules ):
+	if os.path.isdir( node_modules ):
+		for dirname in os.listdir( node_modules ):
+			path = os.path.join(node_modules, dirname)
+			for filename in os.listdir(path):
+				if filename.endswith('.js'):
+					PATHS[ 'modules' ][ filename ] = os.path.join( path, filename )
+
+check_for_node_modules('/usr/local/lib/node_modules')
+
 
 def get_main_page(server):
 	root = PATHS['webroot']
@@ -76,12 +87,23 @@ class MainHandler( tornado.web.RequestHandler ):
 				if path.endswith( '.html' ):
 					data = convert_python_html_document( data )
 					self.set_header("Content-Type", "text/html; charset=utf-8")
-
-				else:  ## only html files are allowed in the webroot
-					raise tornado.web.HTTPError(404)
+				elif path.endswith( '.js' ):
+					self.set_header("Content-Type", "text/javascript; charset=utf-8")
 
 				self.set_header("Content-Length", len(data))
 				self.write( data )
+
+			elif path in PATHS['modules']:
+				data = open( PATHS['modules'][path], 'r' ).read()
+				self.set_header("Content-Type", "text/javascript; charset=utf-8")
+				#self.set_header("Content-Length", len(data))  ## TODO fix me, why do some bytes get clipped?
+				self.write( data )
+
+			elif path == 'favicon.ico':
+				self.write('')
+			else:
+				print('file not found!')
+				raise tornado.web.HTTPError(404)
 
 
 handlers = [
